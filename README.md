@@ -1,6 +1,6 @@
 # Code Games Code
 
-Program for the RBC Winter 2024 Intern Code Games Competition.
+Code for the RBC Winter 2024 Intern Code Games Competition.
 
 ## Resources
 - [Code Games Website](https://codegames.io/en)
