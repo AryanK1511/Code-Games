@@ -1,0 +1,8 @@
+function random_zig_zag()
+  right(turn_amt)
+  ticks = ticks - 1
+  if ticks <= 0
+    ticks = rand(20, 40)
+    turn_amt = turn_amt * -1
+  end
+end
