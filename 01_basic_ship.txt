@@ -1,0 +1,65 @@
+# ===== VARIABLES =====
+
+
+# ===== This is the main function that takes care of all edge cases =====
+function play_game()
+  # Control the speed and move zig zag everytime
+  control_speed
+  zig_zag_motion
+  
+  # Shift strategy when spotting the enemy
+  if enemy_visible
+    track_and_shoot
+  else
+	  evade_and_seek
+  end
+end
+
+# --- Used to track and shoot the enemy ---
+function track_and_shoot()
+  if speed > 0
+    slower(5)
+  end
+  if enemy_angle > 0
+    right
+  else
+    left
+  end
+  if abs(enemy_angle) < 5
+  	fire
+  end
+end
+
+# --- Used to evade the enemy ---
+function evade_and_seek()
+  # Previous Behaviour
+end
+
+# --- Used to control the speed of the ship ---
+function control_speed()
+  if speed < 2
+  	faster
+  else if speed > 4 
+    slower
+  end
+end
+
+# --- Zig Zag Motion ----
+function zig_zag_motion()
+  if turn_amount == 0
+  turn_amount = 5
+  end
+
+  if turning <= 0
+    turning = rand(15, 45)
+    turn_amount *= -1
+  end
+
+  if turning > 0
+    right(turn_amount)
+    turning -= 1
+  end
+end
+
+# Calling the play_game() function and executing the logic
+play_game
