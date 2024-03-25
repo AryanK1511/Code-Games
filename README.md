@@ -2,8 +2,6 @@
 
 Code for the RBC Winter 2024 Intern Code Games Competition.
 
-# Game Logic
-
 ## Resources
 - [Code Games Website](https://codegames.io/en)
 - [Code Games Practice Playground](https://codegames.io/en/practice)

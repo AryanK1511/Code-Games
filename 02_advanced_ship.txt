@@ -1,5 +1,3 @@
-# ===== VARIABLES =====
-
 # ===== LAST TICK VARIABLES SAVER =====
 function save_vars()
   last_enemy_visible = enemy_visible
@@ -10,144 +8,192 @@ function save_vars()
   last_direction = direction
 end
 
-# ===== This is the main function that takes care of all edge cases =====
-function play_game()
-  # Control the speed and move zig zag everytime
-  control_speed
-  zig_zag_motion
-  
-  # Shift strategy when spotting the enemy
-  if enemy_visible
-	  track_and_shoot
-  else
-    evade_and_seek
-  end
-end
-
-# --- Used to track and shoot the enemy ---
-function track_and_shoot()
-  # Calculate the time it takes for a shot to reach the enemy
-  shot_time = enemy_distance / 500  
-
-  # Predict future position of the enemy
-  future_enemy_angle = enemy_angle + (enemy_speed * shot_time * sin(enemy_angle * 3.14 / 180))
-  future_enemy_distance = enemy_distance + (enemy_speed * shot_time * cos(enemy_angle * 3.14 / 180))
-
-  # Adjust the ship's direction to aim at the future position of the enemy
-  aim_at_future_position(future_enemy_angle, future_enemy_distance)
-
-  # Fire when the alignment is close to the predicted future position
-  if abs(future_enemy_angle) < 5 and future_enemy_distance < 150
-    fire
-  end
-end
-
-function aim_at_future_position(future_enemy_angle, future_enemy_distance)
-  # Calculate the absolute angle to the future position of the enemy
-  future_absolute_angle = (last_direction + future_enemy_angle) % 360
-
-  # Calculate the angle difference between the ship's current direction and the future absolute angle
-  angle_difference = future_absolute_angle - last_direction
-
-  # Normalize the angle difference to the range [-180, 180]
-  if angle_difference > 180
-    angle_difference -= 360
-  else if angle_difference < -180
-    angle_difference += 360
-  end
-
-  # Turn towards the future position of the enemy
-  if angle_difference > 0
-    right(angle_difference)
-  else
-    left(-angle_difference)
-  end
-end
-
-function evade_and_seek()
-  # Estimate how long it takes for the enemy to reach their next shot based on their shooting frequency
-  enemy_shot_time = 50  # Assuming the enemy fires once every 50 cycles
-
-  # Predict the enemy's future position based on their current speed and direction
-  predicted_enemy_angle = enemy_angle + (enemy_speed * enemy_shot_time * sin(enemy_angle * 3.14 / 180))
-  predicted_enemy_distance = enemy_distance + (enemy_speed * enemy_shot_time * cos(enemy_angle * 3.14 / 180))
-
-  # Determine an evasion direction that is perpendicular to the enemy's predicted line of fire
-  # We choose evasion to either side based on the current situation, flipping the angle by 90 degrees
-  evasion_angle = predicted_enemy_angle + 90
-  if evasion_angle > 360
-    evasion_angle -= 360
-  end
-
-  # Calculate a safe distance to maintain from the predicted enemy position
-  safe_distance = max(150, predicted_enemy_distance)  # Ensure a minimum safe distance
-
-  # Use the evasion angle and safe distance to maneuver the ship
-  maneuver_to_evasion_point(evasion_angle, safe_distance)
-end
-
-function maneuver_to_evasion_point(evasion_angle, safe_distance)
-  # Turn the ship towards the evasion angle
-  future_absolute_angle = (last_direction + evasion_angle) % 360
-  angle_difference = future_absolute_angle - last_direction
-
-  # Normalize the angle difference
-  if angle_difference > 180
-    angle_difference -= 360
-  else if angle_difference < -180
-    angle_difference += 360
-  end
-
-  # Execute the turn
-  if angle_difference > 0
-    right(angle_difference)
-  else
-    left(-angle_difference)
-  end
-
-  # Adjust the speed to maintain the safe distance
-  if enemy_distance < safe_distance
-    faster
-  else
-    slower
-  end
-end
-
-# --- Used to control the speed of the ship ---
-function control_speed()
-  faster
-end
-
-function set_speed(target_speed)
-  # Calculate the difference between current and target speed
-  speed_difference = target_speed - speed
-
-  if speed_difference > 0
-    faster(speed_difference)
-  else if speed_difference < 0
-    slower(-speed_difference)
-  end
-end
+# ===== HELPER FUNCTIONS =====
 
 # --- Zig Zag Motion ----
 function zig_zag_motion()
+  # Set a random turn amount if it is 0
   if turn_amount == 0
-  turn_amount = 5
+    turn_amount = rand(5, 15)
   end
 
+  # Switch the direction of turning if the turning variable is exhausted
   if turning <= 0
-    turning = rand(5, 50)
+    turning = rand(20, 50)
     turn_amount *= -1
   end
 
+  # Turn in some direction and reduce the turning variable
   if turning > 0
     right(turn_amount)
     turning -= 1
   end
 end
 
+# --- Follow spaceships and fire ---
+function follow_and_fire()
+  # Close the distance
+  if enemy_distance > 300
+    rift
+  end
+  
+  # Constants
+  shot_speed = 10 # speed of the shot
+  
+  # Calculate the delta values for angle and distance
+  delta_angle = enemy_angle - last_enemy_angle
+  delta_distance = enemy_distance - last_enemy_distance
+  delta_speed = speed - last_speed
+
+  # Make sure delta_angle is normalized between -90 and +90
+	if delta_angle > 180
+  	delta_angle -= 360
+  else if delta_angle < -180
+  	delta_angle += 360
+end
+
+  # Estimate the enemy's current speed and direction
+  enemy_speed = sqrt(delta_distance * delta_distance + last_enemy_distance * last_enemy_distance - 2 * delta_distance * last_enemy_distance * cos(delta_angle))
+  enemy_direction_change = atan2(delta_distance * sin(delta_angle), last_enemy_distance + delta_distance * cos(delta_angle))
+
+  # Calculate the time it takes for a projectile to reach the enemy's current position
+  time_to_hit = enemy_distance / shot_speed
+
+  # Predict the enemy's future position considering their speed and direction change
+  predicted_enemy_angle = enemy_angle + delta_angle * time_to_hit + enemy_direction_change * time_to_hit
+  predicted_enemy_distance = enemy_distance + enemy_speed * time_to_hit
+
+  # Normalize predicted_enemy_angle to be between -180 and +180 for turning decisions
+  predicted_enemy_angle = predicted_enemy_angle % 360
+
+  # Determine the direction to turn based on the predicted angle
+  if predicted_enemy_angle >= 0
+    right(predicted_enemy_angle)  # Enemy is predicted to be on the right
+  else
+    left(-predicted_enemy_angle)  # Enemy is predicted to be on the left
+  end
+
+  # Adjust speed to maintain optimal distance
+  faster(enemy_distance - 130)
+
+  # Fire if the enemy is within a reasonable distance and visible
+  if abs(enemy_angle) <= 5 and enemy_distance <= 200
+    fire
+  end
+end
+
+# --- Long range evasion ---
+function turn_around_and_seek()
+  slower(5)
+  right(360)
+end
+
+# --- Close range evasion ---
+function rift_and_seek()
+  # Go faster and rift if possible for wrap around
+  faster(5)
+  rift
+end
+
+# --- The default evasion strategy ---
+function evade_and_seek()
+  if speed <= 3
+    faster(1)
+  end
+  zig_zag_motion
+end
+
+# --- Function to store energy in the last second ---
+function manage_energy_with_ticks()
+  # Update current energy with the actual energy value from the game
+  current_energy = energy
+
+  # Increment the ticks counter
+  ticks_counter += 1
+
+  # Every 50 ticks, update energy_last_second
+  if ticks_counter == 50
+    energy_last_second = current_energy
+    ticks_counter = 0  # Reset the counter for the next cycle
+  end
+end
+
+# --- Rift evasion in case of emergency ---
+function activate_emergency_evac()
+  if enemy_distance < 200
+    activated = false
+    # Check if we got hit and reset the ticks_to_next_hit counter
+    if energy < energy_last_second
+      hello += 1
+      activated = true
+      ticks_to_next_hit = 50 # Assume the enemy will shoot again as soon as they can
+    end
+
+    # Decrement the tick counter only if it's greater than 0
+    if ticks_to_next_hit > 0
+      ticks_to_next_hit -= 1
+    end
+
+    # Start evasive maneuver if the enemy is visible and the counter is low
+    if activated == true
+      # Is 10 ticks enough to escape? If not, consider adjusting this value
+      rift_and_turn
+      bye += 1
+      activated = false
+    end
+  end
+end
+
+# --- Rift and Turn Function ---
+function rift_and_turn()
+  faster(5)
+  rift 
+  turn_amount = 360 
+  if rand(0, 1) == 0
+    left(turn_amount)
+  else
+    right(turn_amount)
+  end
+end
+
+# =========================
+# ===== MAIN FUNCTION =====
+# =========================
+function play_game()
+  # Manage energy stats
+  manage_energy_with_ticks
+  
+  # Evade when emergency 
+  activate_emergency_evac
+  
+  # If enemy is not visible then try to locate 
+  if !enemy_visible
+    
+    # We just lost sight of the enemy
+    if last_enemy_visible
+      
+      # If the enemy was far
+      if last_enemy_distance > 200 
+        turn_around_and_seek
+        
+      # We are going fast and enemy is close, so its better to wrap around
+      else if last_enemy_distance < 20 and speed > 4
+        rift_and_seek
+      end  
+      
+    # Choose default strategy
+    else
+      evade_and_seek
+    end 
+    
+  # If enemy is visible, then attack
+  else
+    follow_and_fire
+  end
+   
+  # Update vars to save previous state
+	save_vars    
+end
+
 # Calling the play_game() function and executing the logic
 play_game
-
-# Save last tick vars
-save_vars
