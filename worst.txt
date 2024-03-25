@@ -1,0 +1,169 @@
+# ===== VARIABLES =====
+
+# ===== LAST TICK VARIABLES SAVER =====
+function save_vars()
+  last_enemy_visible = enemy_visible
+  last_enemy_angle = enemy_angle
+  last_enemy_distance = enemy_distance
+  last_energy = energy
+  last_speed = speed
+  last_direction = direction
+end
+
+# ===== HELPER FUNCTIONS =====
+
+# --- Zig Zag Motion ----
+function zig_zag_motion()
+  # Set a random turn amount if it is 0
+  if turn_amount == 0
+    turn_amount = rand(5, 15)
+  end
+
+  # Switch the direction of turning if the turning variable is exhausted
+  if turning <= 0
+    turning = rand(20, 50)
+    turn_amount *= -1
+  end
+
+  # Turn in some direction and reduce the turning variable
+  if turning > 0
+    right(turn_amount)
+    turning -= 1
+  end
+end
+
+# --- Used to control the speed of the ship ---
+function control_speed()
+  # Define dynamic speed thresholds based on tactical needs
+  max_combat_speed = 3  # Optimal speed for combat maneuvering and accuracy
+  cruising_speed = 4    # Speed for general movement around the arena
+  max_speed = 5         # Maximum speed for fast repositioning or evasion
+
+  # Adjust speed based on current tactical situation
+  if enemy_visible
+    # When the enemy is visible, decide speed based on their distance
+    if enemy_distance < 100
+      # If very close to the enemy, slow down for precise maneuvering and combat
+      target_speed = max_combat_speed
+    else if enemy_distance > 300
+      # If the enemy is far, increase speed to close the gap or to evade effectively
+      target_speed = max_speed
+    else
+      # Maintain a moderate speed for balanced maneuverability and reaction time
+      target_speed = cruising_speed
+    end
+  else
+    # If the enemy is not visible, use maximum speed to search and intercept
+    target_speed = max_speed
+  end
+  
+  current_speed_diff = target_speed - speed
+
+  # Determine the rate of speed change based on the urgency of the situation
+  if abs(current_speed_diff) > 1
+    speed_change_rate = 5  # More aggressive speed change
+  else
+    speed_change_rate = 3  # Gradual speed change
+  end
+
+  # Adjust speed gradually towards the target speed
+  if current_speed_diff > 0
+    faster(speed_change_rate)
+  else if current_speed_diff < 0
+    slower(speed_change_rate)
+  end
+end
+
+function track_and_shoot()
+  ticks_to_next_hit = 0
+
+  # Turn towards the predicted enemy angle
+ 	turn_towards_predicted_angle(predicted_enemy_angle)
+
+  # Fire if the enemy is visible and the predicted angle and distance are favorable
+  if enemy_visible and abs(predicted_enemy_angle) < 5 and predicted_enemy_distance < 150
+    fire
+  end
+end
+
+function turn_towards_predicted_angle(predicted_angle)
+  if predicted_enemy_angle > 0
+    right
+  else
+    left
+  end
+end
+
+function evade_and_seek()
+  if energy < last_energy
+    # We just got hit
+    ticks_to_next_hit = 50 
+  end
+  
+  if !enemy_visible and ticks_to_next_hit < 10
+    rift_and_turn
+  end
+  
+  ticks_to_next_hit -= 1
+end
+
+function rift_and_turn()
+  # Increase speed to get away if possible
+  rift
+  
+  # Turn depending on what direction you are in
+  if direction < 180
+    left(180)
+  else
+    right(180)
+  end
+end
+
+function calculate_metrics()
+  # Calculate angular and linear velocities
+  delta_angle = current_enemy_angle - last_enemy_angle
+  delta_distance = current_enemy_distance - last_enemy_distance
+
+  # Ensure angles wrap around correctly
+  if delta_angle > 180
+    delta_angle -= 360
+  else if delta_angle < -180
+    delta_angle += 360
+  end
+
+  angular_velocity = delta_angle # angular change per tick
+  linear_velocity = delta_distance # linear change per tick
+
+  # Calculate the time it takes for a projectile to reach the current enemy position
+  time_to_hit = enemy_distance / 15
+
+  # Predict the future enemy angle and distance after the projectile travel time
+  predicted_enemy_angle = current_enemy_angle + (angular_velocity * time_to_hit)
+  predicted_enemy_distance = current_enemy_distance + (linear_velocity * time_to_hit)
+
+  # Ensure the predicted angle is within the bounds [0, 360]
+  predicted_enemy_angle = (predicted_enemy_angle) % 360
+end
+
+# =========================
+# ===== MAIN FUNCTION =====
+# =========================
+function play_game()
+  # Execute basic operations
+  calculate_metrics
+  control_speed  
+  zig_zag_motion
+  
+  # Handle scenarios
+  if enemy_visible
+    track_and_shoot
+  else
+    evade_and_seek
+  end
+   
+  # Update vars to save previous state
+	save_vars    
+end
+
+# Calling the play_game() function and executing the logic
+play_game

@@ -1,0 +1,16 @@
+function follow_and_fire()
+  # Adjust speed based on the enemy distance for more control
+  faster(enemy_distance - 100)
+  
+  # Adjust the ship's direction towards the enemy
+  if enemy_angle > 0
+    right(abs(enemy_angle))
+  else if enemy_angle < 0
+    left(abs(enemy_angle))
+  end
+
+  # Fire if the enemy is visible and in a reasonable distance
+  if enemy_visible and enemy_distance <= 250
+    fire
+  end
+end

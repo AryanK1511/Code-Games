@@ -1,0 +1,153 @@
+# ===== VARIABLES =====
+
+# ===== LAST TICK VARIABLES SAVER =====
+function save_vars()
+  last_enemy_visible = enemy_visible
+  last_enemy_angle = enemy_angle
+  last_enemy_distance = enemy_distance
+  last_energy = energy
+  last_speed = speed
+  last_direction = direction
+end
+
+# ===== This is the main function that takes care of all edge cases =====
+function play_game()
+  # Control the speed and move zig zag everytime
+  control_speed
+  zig_zag_motion
+  
+  # Shift strategy when spotting the enemy
+  if enemy_visible
+	  track_and_shoot
+  else
+    evade_and_seek
+  end
+end
+
+# --- Used to track and shoot the enemy ---
+function track_and_shoot()
+  # Calculate the time it takes for a shot to reach the enemy
+  shot_time = enemy_distance / 500  
+
+  # Predict future position of the enemy
+  future_enemy_angle = enemy_angle + (enemy_speed * shot_time * sin(enemy_angle * 3.14 / 180))
+  future_enemy_distance = enemy_distance + (enemy_speed * shot_time * cos(enemy_angle * 3.14 / 180))
+
+  # Adjust the ship's direction to aim at the future position of the enemy
+  aim_at_future_position(future_enemy_angle, future_enemy_distance)
+
+  # Fire when the alignment is close to the predicted future position
+  if abs(future_enemy_angle) < 5 and future_enemy_distance < 150
+    fire
+  end
+end
+
+function aim_at_future_position(future_enemy_angle, future_enemy_distance)
+  # Calculate the absolute angle to the future position of the enemy
+  future_absolute_angle = (last_direction + future_enemy_angle) % 360
+
+  # Calculate the angle difference between the ship's current direction and the future absolute angle
+  angle_difference = future_absolute_angle - last_direction
+
+  # Normalize the angle difference to the range [-180, 180]
+  if angle_difference > 180
+    angle_difference -= 360
+  else if angle_difference < -180
+    angle_difference += 360
+  end
+
+  # Turn towards the future position of the enemy
+  if angle_difference > 0
+    right(angle_difference)
+  else
+    left(-angle_difference)
+  end
+end
+
+function evade_and_seek()
+  # Estimate how long it takes for the enemy to reach their next shot based on their shooting frequency
+  enemy_shot_time = 50  # Assuming the enemy fires once every 50 cycles
+
+  # Predict the enemy's future position based on their current speed and direction
+  predicted_enemy_angle = enemy_angle + (enemy_speed * enemy_shot_time * sin(enemy_angle * 3.14 / 180))
+  predicted_enemy_distance = enemy_distance + (enemy_speed * enemy_shot_time * cos(enemy_angle * 3.14 / 180))
+
+  # Determine an evasion direction that is perpendicular to the enemy's predicted line of fire
+  # We choose evasion to either side based on the current situation, flipping the angle by 90 degrees
+  evasion_angle = predicted_enemy_angle + 90
+  if evasion_angle > 360
+    evasion_angle -= 360
+  end
+
+  # Calculate a safe distance to maintain from the predicted enemy position
+  safe_distance = max(150, predicted_enemy_distance)  # Ensure a minimum safe distance
+
+  # Use the evasion angle and safe distance to maneuver the ship
+  maneuver_to_evasion_point(evasion_angle, safe_distance)
+end
+
+function maneuver_to_evasion_point(evasion_angle, safe_distance)
+  # Turn the ship towards the evasion angle
+  future_absolute_angle = (last_direction + evasion_angle) % 360
+  angle_difference = future_absolute_angle - last_direction
+
+  # Normalize the angle difference
+  if angle_difference > 180
+    angle_difference -= 360
+  else if angle_difference < -180
+    angle_difference += 360
+  end
+
+  # Execute the turn
+  if angle_difference > 0
+    right(angle_difference)
+  else
+    left(-angle_difference)
+  end
+
+  # Adjust the speed to maintain the safe distance
+  if enemy_distance < safe_distance
+    faster
+  else
+    slower
+  end
+end
+
+# --- Used to control the speed of the ship ---
+function control_speed()
+  faster
+end
+
+function set_speed(target_speed)
+  # Calculate the difference between current and target speed
+  speed_difference = target_speed - speed
+
+  if speed_difference > 0
+    faster(speed_difference)
+  else if speed_difference < 0
+    slower(-speed_difference)
+  end
+end
+
+# --- Zig Zag Motion ----
+function zig_zag_motion()
+  if turn_amount == 0
+  turn_amount = 5
+  end
+
+  if turning <= 0
+    turning = rand(5, 50)
+    turn_amount *= -1
+  end
+
+  if turning > 0
+    right(turn_amount)
+    turning -= 1
+  end
+end
+
+# Calling the play_game() function and executing the logic
+play_game
+
+# Save last tick vars
+save_vars
