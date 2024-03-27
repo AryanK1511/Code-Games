@@ -7,8 +7,21 @@ function save_vars()
   last_speed = speed
   last_direction = direction
 end
-faster
+
 # ===== HELPER FUNCTIONS =====
+
+# --- Function to have better prediction while shooting ---
+function calculate_last_second_enemy_position()
+  # Increment the ticks counter
+  ticks_counter_2 += 1
+
+  # Every 50 ticks, update energy_last_second
+  if ticks_counter_2 == 50
+    last_second_enemy_angle = enemy_angle
+  	last_second_enemy_distance = enemy_distance
+    ticks_counter_2 = 0  # Reset the counter for the next cycle
+  end
+end
 
 # --- Zig Zag Motion with Unpredictable Speed ---
 function zig_zag_motion()
@@ -35,18 +48,13 @@ function zig_zag_motion()
 end
 
 # --- Follow spaceships and fire ---
-function follow_and_fire()
-  # Close the distance
-  if enemy_distance > 300
-    rift
-  end
-  
+function follow_and_fire()  
   # Constants
   shot_speed = 10 # speed of the shot
   
   # Calculate the delta values for angle and distance
-  delta_angle = enemy_angle - last_enemy_angle
-  delta_distance = enemy_distance - last_enemy_distance
+  delta_angle = enemy_angle - last_second_enemy_angle
+  delta_distance = enemy_distance - last_second_enemy_distance
   delta_speed = speed - last_speed
 
   # Make sure delta_angle is normalized between -90 and +90
@@ -54,11 +62,11 @@ function follow_and_fire()
   	delta_angle -= 360
   else if delta_angle < -180
   	delta_angle += 360
-end
+	end
 
   # Estimate the enemy's current speed and direction
-  enemy_speed = sqrt(delta_distance * delta_distance + last_enemy_distance * last_enemy_distance - 2 * delta_distance * last_enemy_distance * cos(delta_angle))
-  enemy_direction_change = atan2(delta_distance * sin(delta_angle), last_enemy_distance + delta_distance * cos(delta_angle))
+  enemy_speed = sqrt(delta_distance * delta_distance + last_second_enemy_distance * last_second_enemy_distance - 2 * delta_distance * last_second_enemy_distance * cos(delta_angle))
+  enemy_direction_change = atan2(delta_distance * sin(delta_angle), last_second_enemy_distance + delta_distance * cos(delta_angle))
 
   # Calculate the time it takes for a projectile to reach the enemy's current position
   time_to_hit = enemy_distance / shot_speed
@@ -78,10 +86,14 @@ end
   end
 
   # Adjust speed to maintain optimal distance
-  faster(enemy_distance - 130)
+  if speed < 3
+  	faster(enemy_distance - 80)
+  else
+    faster(enemy_distance - 600)
+  end
 
   # Fire if the enemy is within a reasonable distance and visible
-  if abs(enemy_angle) <= 5 and enemy_distance <= 300
+  if abs(enemy_angle) <= 10 and enemy_distance <= 300
     fire
   end
 end
@@ -98,7 +110,7 @@ end
 function adjust_speed_after_invisibility()
   if increasing_speed > 0
     if speed < 5
-      faster(1)  # Incrementally increase speed
+      faster(3)  # Incrementally increase speed
       left(360)
     end
   end
@@ -119,53 +131,63 @@ function manage_energy_with_ticks()
   end
 end
 
-# --- Rift Evasion and Repositioning ---
-function rift_evasion_and_repositioning()
-  if enemy_distance < 200 and energy < energy_last_second
-    activated = true
-    rift_and_turn
-  else if activated
-    follow_and_fire  # Engage the enemy after repositioning
-    activated = false
-  end
-end
-
-# --- Rift and Turn Function ---
-function rift_and_turn()
+# --- Try to go around by rifting ---
+function quick_evasion_and_go_around()
   faster(5)
   rift
-  
+end
+
+# --- Fire everytime you think you can for a by chance hit ---
+function fire_func()
+  # Fire if the enemy is within a reasonable distance and visible
+  if abs(enemy_angle) <= 3 and enemy_distance <= 60
+    fire
+  end
 end
 
 # =========================
 # ===== MAIN FUNCTION =====
 # =========================
 
-function play_game()
+function play_game()  
+  fire_func
+	calculate_last_second_enemy_position
   manage_energy_with_ticks
   save_vars  # Save the state variables at the beginning of each cycle
-
-  # Evasion and repositioning when hit
-  if energy < energy_last_second
-    if enemy_distance < 300
-      rift_evasion_and_repositioning
+  
+  # If the enemy is not visible
+  if !enemy_visible
+    enemy_invisible_cycles += 1
+    
+    if enemy_invisible_cycles > 100
+      increasing_speed = 1 
+      adjust_speed_after_invisibility
     else
-      zig_zag_motion  # Evasive maneuvering when under fire
+      slow_down_and_rotate  # Rotate in place to locate the enemy
+    end
+    
+    # Check to see if we just passed them
+    if last_enemy_visible
+      # If the distance is feasable you either turn or run to go around based on the speed
+      if last_enemy_distance < 250
+        if speed > 3
+          quick_evasion_and_go_around
+        else
+          slow_down_and_rotate
+        end
+      end
+    # If you git hit and cant see the enemy
+    else if energy < energy_last_second
+      zig_zag_motion
+      rift
+    else
+      slow_down_and_rotate
     end
   else
-    # Rotate and search for the enemy when not visible
-    if !enemy_visible
-      enemy_invisible_cycles += 1
-      if enemy_invisible_cycles > 100
-        adjust_speed_after_invisibility
-      else
-        slow_down_and_rotate  # Rotate in place to locate the enemy
-      end
-    else
-      enemy_invisible_cycles = 0
-      # Chase and attack the enemy when visible
-      follow_and_fire
-    end
+    enemy_invisible_cycles = 0
+    increasing_speed = 0
+    # Chase and attack the enemy when visible
+    follow_and_fire
   end
 end
 
